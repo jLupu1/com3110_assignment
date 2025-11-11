@@ -10,7 +10,6 @@ class Retrieve:
         self.term_weighting = term_weighting
         self.num_docs = self.compute_number_of_documents()
         
-        print(term_weighting)
         if term_weighting == 'tf':
             self.doc_term_matrix = self.compute_doc_term_matrix_tf()
         elif term_weighting == "tfidf":
@@ -18,14 +17,6 @@ class Retrieve:
         else:
             self.doc_term_matrix = self.compute_doc_term_matrix_binary()
             
-
-
-    # Maps each term in self.index to an index
-    def term_index_dict(self):
-        res_dict = {}
-        for index, term in enumerate(self.index):
-            res_dict[term] = index
-        return res_dict
             
     
     def compute_number_of_documents(self):
@@ -33,13 +24,6 @@ class Retrieve:
         for term in self.index:
             self.doc_ids.update(self.index[term])
         return len(self.doc_ids)
-    
-    
-    def compute_number_of_terms(self):
-        self.terms = set() 
-        for term in self.index:
-            self.terms.add(term)
-        return len(self.terms)
     
 
     # Create matrix for binary weighting
@@ -67,33 +51,39 @@ class Retrieve:
     
     # Creates matrix each row is a doc with dict {term : count}
     # tf weighting - counting the freq of each term for each doc
-    def compute_doc_term_matrix_tfidf(self):
+    def compute_doc_term_matrix_tfidf(self):    
         matrix = [{} for _ in range(self.num_docs)]
         
         # Iterate through each unique term in the index
         for term, doc_counts in self.index.items():
+            # Get Document Frequency (DF_w)
+            df_w = len(doc_counts)
+            
+            idf = math.log10(((self.num_docs + 1) / (df_w + 1)))
+            
             for doc_id, count in doc_counts.items():
-
-                df_w = len(doc_counts)
-                idf = math.log10((self.num_docs/df_w+1))
                 
-                if count > 0:
-                    tf = 1 + math.log10(count)
-                else:
-                    tf = 0
-                
-                tf_idf = tf * idf
+                tf = 1 + math.log10(count)
                 
                 # doc_id - 1 for 0-based list index
-                matrix[doc_id-1][term] = tf_idf
+                matrix[doc_id-1][term] =  tf * idf
+                
         return matrix
+    
     
     
     # Method performing retrieval for a single query (which is 
     # represented as a list of preprocessed terms).​ Returns list 
     # of doc ids for relevant docs (in rank order).
     def for_query(self, query):
-        similarity_data = self.calculate_sim(self.query_matrix(query))
+        if self.term_weighting == "tfidf":
+            query_matrix = self.query_matrix_tfidf(query)
+        elif self.term_weighting == "tf":
+            query_matrix = self.query_matrix_tf(query)
+        else:
+            query_matrix = self.query_matrix_binary(query)
+            
+        similarity_data = self.calculate_sim(query_matrix)
         sorted_items = sorted(similarity_data.items(), 
                               key=lambda item: item[1], reverse=True)
         return [item[0] for item in sorted_items[:10]]
@@ -101,12 +91,38 @@ class Retrieve:
     
     # turn the query into vector    
     # Query is passed as tuple (id,list(terms))
-    def query_matrix(self, query):
+    
+    
+    def query_matrix_tf(self,query):
         matrix = {}
-      
+        for term in query:
+            matrix[term] = matrix.get(term,0) + 1
+        return matrix
+    
+    def query_matrix_binary(self,query):
+        matrix = {}
+        for term in query:
+            matrix[term] = 1
+        return matrix
+    
+    def query_matrix_tfidf(self,query):
+        # Two pass solution, 1st counts tf for each term, 2nd calculates tfidf 
+        
+        matrix = {}
+        # Counts freq (tf)
         for term in query:
             matrix[term] = matrix.get(term, 0) + 1
+        
+        for term, count in matrix.items():
+            df_w = len(self.index.get(term, {}))
+    
+            idf = math.log10(((self.num_docs + 1) / (df_w + 1)))
+            tf = 1 + math.log10(count)
+            matrix[term] = tf * idf
+            
         return matrix
+         
+        
 
     def calculate_sim(self, query_matrix):
         sim_scores = {}
@@ -120,14 +136,12 @@ class Retrieve:
         for index, doc_vector in enumerate(self.doc_term_matrix):
             sum_qd = 0
             sqrt_sum_d2 = 0 
-
+            
             for term, d_weight in doc_vector.items():
-                
                 sqrt_sum_d2 += (d_weight * d_weight)
-
                 q_weight = query_matrix.get(term, 0)
-                sum_qd += (q_weight * d_weight)
-    
+                sum_qd += (q_weight * d_weight)    
+                
             doc_magnitude = math.sqrt(sqrt_sum_d2)
     
             # Check for overlap
@@ -140,14 +154,4 @@ class Retrieve:
                 
         return sim_scores
     
-    
-            
-            
-            
-            
-            
-    
-
-        
-
 
