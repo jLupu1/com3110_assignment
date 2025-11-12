@@ -89,14 +89,16 @@ class Retrieve:
         return [item[0] for item in sorted_items[:10]]
     
     
-    # turn the query into vector    
+    # turn the query into vector using selected weightings
     # Query is passed as tuple (id,list(terms))
-    
     
     def query_matrix_tf(self,query):
         matrix = {}
         for term in query:
             matrix[term] = matrix.get(term,0) + 1
+            
+        for term in matrix:
+            matrix[term] = 1 + math.log10(matrix[term])
         return matrix
     
     def query_matrix_binary(self,query):
@@ -116,7 +118,7 @@ class Retrieve:
         for term, count in matrix.items():
             df_w = len(self.index.get(term, {}))
     
-            idf = math.log10(((self.num_docs + 1) / (df_w + 1)))
+            idf = math.log10(((self.num_docs + 1) / (df_w + 1))) + 1
             tf = 1 + math.log10(count)
             matrix[term] = tf * idf
             
@@ -153,5 +155,7 @@ class Retrieve:
                 pass 
                 
         return sim_scores
+    
+
     
 
