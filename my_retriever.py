@@ -155,7 +155,3 @@ class Retrieve:
                 pass 
                 
         return sim_scores
-    
-
-    
-
