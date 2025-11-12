@@ -59,7 +59,7 @@ class Retrieve:
             # Get Document Frequency (DF_w)
             df_w = len(doc_counts)
             
-            idf = math.log10(((self.num_docs + 1) / (df_w + 1)))
+            idf = math.log10(((self.num_docs + 1) / (df_w + 1))) + 1
             
             for doc_id, count in doc_counts.items():
                 
